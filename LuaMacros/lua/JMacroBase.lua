@@ -280,21 +280,42 @@ JMacros_base_handler= function(deviceNumber, states , button, direction, deviceT
           end
        end
 
-       if(states.directions[button]== direction) then
+       if(states.directions[deviceNumber]== direction) then
              return
        end
-       states.directions[button]= direction
+
+
+       states.directions[deviceNumber]= direction
+       states.keyStates[deviceNumber]= direction==1
+
+       if(direction==0) then
+       else direction=1
+       end
+
 
        local request,  updateIndex,  rv
-
        request= 'http://'..JMA.server_address..':'..JMA.server_port..'/'..  '?'
-                request=request ..'source=' .. JMA.urlencode(deviceNumber)
-                request=request .. '&k=' .. button .. '&d=' .. direction  ..'&t=' ..deviceType
+
+       request=request .. 'source=' .. deviceNumber
+       request=request .. '&k=' .. button
+       request=request .. '&d=' .. direction
+       request=request .. '&t=1'
+
+       print('request '..request)
+
 
        rv=lmc_http_get(request, 1)
+
+
+
+       if(JMA.strfind (rv, 'UNKNOWN')  == 1) then
+			print ('Device Unknown5')
+			-- Fromd macrorecorder
+			lmc_send_keys(getModifiers(states) .. getKeyName(button))
+			JMA.readUpdates(rv)
 	   
 	   
-		if(JMA.strfind (rv, 'PASS')  == 1) then 	   
+       elseif(JMA.strfind (rv, 'PASS')  == 1) then
 			print ('Device Ignored')
 			-- Fromd macrorecorder
 			lmc_send_keys(getModifiers(states) .. getKeyName(button))
