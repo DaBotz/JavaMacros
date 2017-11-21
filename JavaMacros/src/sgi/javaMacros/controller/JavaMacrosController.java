@@ -6,6 +6,8 @@ import java.awt.Dialog.ModalityType;
 import java.awt.HeadlessException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -32,6 +34,7 @@ import sgi.javaMacros.os.windows.RawInputs;
 import sgi.javaMacros.ui.dialogs.ApplicationListDialog;
 import sgi.javaMacros.ui.dialogs.DeviceInputDialog;
 import sgi.javaMacros.ui.dialogs.DeviceSetFrame;
+import sgi.javaMacros.ui.dialogs.NoButtonsDeviceDialog;
 import sgi.javaMacros.ui.tray.JavaMacros_System_Tray;
 import sgi.javaMacros.ui.tray.TrayEvent;
 import sgi.javaMacros.ui.tray.TrayEventListener;
@@ -135,32 +138,51 @@ public class JavaMacrosController {
 
 		ApplicationListDialog dialog = new ApplicationListDialog(null, ModalityType.APPLICATION_MODAL);
 		dialog.loadApplications();
-
-		dialog.threadSafeShow();
+		dialog.autoPosition();
+		dialog.setVisible(true);
 
 	}
 
 	private class DevicesSetObserver implements ActionListener {
 
 		String oDs, nDs = oDs = RawInputs.rawDevicesSnapshot();
+		private int counter = 0;
+		private static final int multiplier = 4;
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
 
+			alignDelay(e);
+
+			if ((++counter) == multiplier) {
+				counter = 0;
+				if (!oDs.equals(nDs = RawInputs.rawDevicesSnapshot())) {
+					system_Tray.displayMessage(Messages.M.getString(this, "DeviceChainChange.title"), //
+							Messages.M.getString(this, "DeviceChainChange.body"));
+
+					httpServer.addUpdate(getLuaComposer().getScanUpdate());
+					oDs = nDs;
+				}
+				if (!(!luaMacrosCfgBase.isLuaMacrosKeptAlive() || //
+						luaMacrosExecutable == null //
+						|| luaMacrosExecutable.isRunning())) {
+					launchLuaMacros();
+				}
+			}
+
+		}
+
+		protected void alignDelay(ActionEvent e) {
 			Object source = e.getSource();
 			if (source instanceof Timer) {
-				Timer timer = (Timer) source;
-				timer.setDelay((int) luaMacrosCfgBase.getDeviceCheckInterval());
+				((Timer) source).setDelay(getDelay());
 			}
+		}
 
-			if (!oDs.equals(nDs = RawInputs.rawDevicesSnapshot())) {
-				system_Tray.displayMessage(Messages.M.getString(this, "DeviceChainChange.title"), //
-						Messages.M.getString(this, "DeviceChainChange.body"));
-
-				httpServer.addUpdate(getLuaComposer().getScanUpdate());
-			}
-			oDs = nDs;
-
+		protected int getDelay() {
+			int deviceCheckInterval = (int) luaMacrosCfgBase.getDeviceCheckInterval();
+			deviceCheckInterval = Math.max(100, deviceCheckInterval / multiplier);
+			return deviceCheckInterval;
 		}
 
 		public void start() {
@@ -259,20 +281,21 @@ public class JavaMacrosController {
 
 	protected void changeLuaConfig() {
 		{
-			ConfigFrame cffDlg = new JMAcrosLuaMacrosConfigurator(luaMacrosCfgBase, Messages.M);
-			cffDlg.threadSafeShow();
-			do {
+			final ConfigFrame cffDlg = new JMAcrosLuaMacrosConfigurator(luaMacrosCfgBase, Messages.M);
+			cffDlg.autoPosition();
+			cffDlg.setVisible(true);
 
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException e) {
+			cffDlg.addComponentListener(new ComponentAdapter() {
+				@Override
+				public void componentHidden(ComponentEvent e) {
+					if (luaMacrosCfgBase.isInconherent()) {
+						JOptionPane.showMessageDialog(cffDlg,
+								Messages.M.getString(this, "luaMacrosCfgBase.isInconherent"));
+						System.exit(1);
+					}
 				}
-			} while (luaMacrosCfgBase.isInconherent() && cffDlg.isVisible());
+			});
 
-			if (luaMacrosCfgBase.isInconherent()) {
-				JOptionPane.showMessageDialog(cffDlg, Messages.M.getString(this, "luaMacrosCfgBase.isInconherent"));
-				System.exit(1);
-			}
 		}
 	}
 
@@ -285,7 +308,6 @@ public class JavaMacrosController {
 		return (int) luaMacrosCfgBase.getServerPort();
 	}
 
-	private String lastUnknowdeviceId;
 	private ExternalProcess luaMacrosExecutable;
 	private JavaMacros_System_Tray system_Tray;
 	private HTTPServer httpServer;
@@ -301,20 +323,24 @@ public class JavaMacrosController {
 					Integer.parseInt("" + direction) == 1, //
 					Integer.parseInt("" + deviceType));
 
-			SwingUtilities.invokeLater(new Runnable() {
+	
+			DeviceSet devices = memory.getDeviceSet();
+			String luaId = event.getLuaId();
+			Device device = devices.find(luaId);
+			event.setDevice(device);
+			
+			Thread thread = new Thread(new Runnable() {
 				@Override
 				public void run() {
 					processLuaEvent(event);
 				}
 			});
+			thread.setName("Macros Thread Decoupler");
+			thread.start();
 
-			DeviceSet devices = memory.getDeviceSet();
-			String luaId = event.getLuaId();
-			Device device = devices.find(luaId);
-			event.setDevice(device);
 
 			if (device == null)
-				return "PASS";
+				return "UNKNOWN";
 
 			if (device.isAutonomousNumLock() && event.getScanCode() == 144)
 				checkForDevicesUpdate();
@@ -342,48 +368,58 @@ public class JavaMacrosController {
 
 	}
 
+	private static String lastUnknowdeviceId;
+
 	protected void processLuaEvent(LuaEvent event) {
 		DeviceSet devices = memory.getDeviceSet();
 		Device device = event.getDevice();
 		String luaId = event.getLuaId();
 		if (device == null) {
+			
+			if (event.isDown())
+				return;
 
-			if (!event.isDown() || luaId.equals(lastUnknowdeviceId))
 
-				lastUnknowdeviceId = luaId;
+			if (luaId.equals(lastUnknowdeviceId))
+				return;
+
+
+			lastUnknowdeviceId = luaId;
 
 			DeviceInputDialog dialog = new DeviceInputDialog(null, ModalityType.TOOLKIT_MODAL);
 			dialog.setDeviceSet(devices);
-			Device ndev = new Device(luaId);
-			dialog.build(ndev, Messages.M);
+			device = new Device(luaId);
+			dialog.build(device, Messages.M);
 			dialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
-			GUIMemory.add(dialog);
 			dialog.threadSafeShow();
 
 			do {
-
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException e) {
-				}
-			} while (!dialog.isSaved() && dialog.isVisible());
-			dialog.setVisible(false);
+				sleep(100);
+			} while (dialog.isVisible());
 
 			if (dialog.isSaved()) {
-				devices.add(device = ndev);
+				devices.add(device);
 				memory.storeToFile();
 				if (device.isIgnored() || device.isAutonomousNumLock()) {
 					httpServer.addUpdates(getLuaComposer().getUpdates());
 				}
-
-			}
-
+			} else
+				device = null;
 			lastUnknowdeviceId = "";
+
 		}
 
 		if (device != null) {
 			event.setDeviceName(device.getName());
 			dispatchToMacros(event);
+		}
+	}
+
+	private void sleep(int i) {
+		try {
+			Thread.sleep(i);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 

@@ -30,6 +30,7 @@ public class HTTPServer implements Runnable {
 	private ArrayList<String> updates = new ArrayList<>();
 
 	public synchronized void addUpdates(ArrayList<String> newUpdates) {
+		newUpdates.removeAll(updates);
 		updates.addAll(newUpdates);
 	}
 
@@ -102,8 +103,8 @@ public class HTTPServer implements Runnable {
 					parameters.get("d"), //
 					parameters.get("t"));
 
-//			for (String key : parameters.keySet())
-//				response += crlf + "  " + key + " = " + parameters.get(key) + " ";
+			// for (String key : parameters.keySet())
+			// response += crlf + " " + key + " = " + parameters.get(key) + " ";
 
 			if (response.startsWith("OK") && updates.size() > 0) {
 				response += crlf + UPDATES_ + stringUpdates();
@@ -134,7 +135,6 @@ public class HTTPServer implements Runnable {
 
 		}
 	}
-
 
 	public static void parseQuery(String query, Map<String, Object> parameters) throws UnsupportedEncodingException {
 
@@ -173,8 +173,8 @@ public class HTTPServer implements Runnable {
 	}
 
 	public void addUpdate(String update) {
-		updates.add(update);
-
+		if (!updates.contains(update))
+			updates.add(update);
 	}
 
 	protected String stringUpdates() {

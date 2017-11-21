@@ -35,7 +35,7 @@ public class ExternalProcess {
 				spawnedProcess.exitValue();
 			} catch (IllegalThreadStateException e) {
 				this.running = true;
-				System.out.println("fast look"); //$NON-NLS-1$
+			//	System.out.println("fast look"); //$NON-NLS-1$
 
 				return;
 			} catch (Throwable e) {
