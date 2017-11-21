@@ -5,6 +5,7 @@ import java.awt.Container;
 import java.awt.Dialog.ModalityType;
 import java.awt.HeadlessException;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import sgi.generic.serialization.AbstractMemoryRoot;
@@ -138,31 +140,33 @@ public class JavaMacrosController {
 
 	}
 
-	private class DevicesSetObserver implements Runnable {
+	private class DevicesSetObserver implements ActionListener {
+
+		String oDs, nDs = oDs = RawInputs.rawDevicesSnapshot();
 
 		@Override
-		public void run() {
-			String oDs, nDs = oDs = RawInputs.rawDevicesSnapshot();
+		public void actionPerformed(ActionEvent e) {
 
-			long ctm = System.currentTimeMillis() + 60000;
-			while (System.currentTimeMillis() < ctm) {
-				try {
-					long deviceCheckInterval = Math.max(500, luaMacrosCfgBase.getDeviceCheckInterval());
-					Thread.sleep(deviceCheckInterval);
-					if (!oDs.equals(nDs = RawInputs.rawDevicesSnapshot())) {
-						System.out.println("Something has changed?");
-						system_Tray.displayMessage(Messages.M.getString(this, "DeviceChainChange.title"), //
-								Messages.M.getString(this, "DeviceChainChange.body"));
-						
-						httpServer.addUpdate(getLuaComposer().getScanUpdate());
-					}
-					oDs = nDs;
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-
+			Object source = e.getSource();
+			if (source instanceof Timer) {
+				Timer timer = (Timer) source;
+				timer.setDelay((int) luaMacrosCfgBase.getDeviceCheckInterval());
 			}
 
+			if (!oDs.equals(nDs = RawInputs.rawDevicesSnapshot())) {
+				system_Tray.displayMessage(Messages.M.getString(this, "DeviceChainChange.title"), //
+						Messages.M.getString(this, "DeviceChainChange.body"));
+
+				httpServer.addUpdate(getLuaComposer().getScanUpdate());
+			}
+			oDs = nDs;
+
+		}
+
+		public void start() {
+
+			Timer timer = new Timer((int) luaMacrosCfgBase.getDeviceCheckInterval(), this);
+			timer.start();
 		}
 
 	}
@@ -198,10 +202,7 @@ public class JavaMacrosController {
 	}
 
 	protected void launchDevicesObserver() {
-		Thread deviceThread = new Thread(new DevicesSetObserver());
-		deviceThread.setDaemon(true);
-		deviceThread.setName("JavaMacros - Devices Snapshot Observer");
-		deviceThread.start();
+		new DevicesSetObserver().start();
 	}
 
 	protected void launchLuaMacros() {
@@ -213,7 +214,9 @@ public class JavaMacrosController {
 		try {
 			luaMacrosExecutable.kill();
 
-		} catch (UnkillableProcessException e) {e.printStackTrace(); }
+		} catch (UnkillableProcessException e) {
+			e.printStackTrace();
+		}
 
 		try {
 			luaMacrosExecutable.launchApp(luaMacrosLocation.getPath()//
@@ -314,8 +317,8 @@ public class JavaMacrosController {
 				return "PASS";
 
 			if (device.isAutonomousNumLock() && event.getScanCode() == 144)
-					checkForDevicesUpdate();
-			
+				checkForDevicesUpdate();
+
 			if (device.isIgnored()) {
 
 				return "PASS";
@@ -397,17 +400,18 @@ public class JavaMacrosController {
 	}
 
 	public void checkForDevicesUpdate() {
-		
+
 		ArrayList<String> updates = getLuaComposer().getUpdates();
-		boolean needscan= false; 
+		boolean needscan = false;
 		for (String string : updates) {
-			needscan|= (string.startsWith(UpdateCommands.ALLOW+"(" )
-					//|| string.startsWith(UpdateCommands.AVOID+"(" )
-					);
+			needscan |= (string.startsWith(UpdateCommands.ALLOW + "(")
+			// || string.startsWith(UpdateCommands.AVOID+"(" )
+			);
 		}
-		if(needscan)updates.add(getLuaComposer().getScanUpdate());
-		httpServer.addUpdates(	updates); 
-		
+		if (needscan)
+			updates.add(getLuaComposer().getScanUpdate());
+		httpServer.addUpdates(updates);
+
 	}
 
 }
