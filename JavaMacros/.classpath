@@ -1,36 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry kind="src" path="testSrc"/>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="src" path="sgi-blackscreen"/>
-	<classpathentry kind="src" path="src-directories-pruner"/>
-	<classpathentry kind="src" path="src-do-not-move-open-torrents"/>
-	<classpathentry kind="src" path="src-done-marker"/>
-	<classpathentry kind="src" path="src-release-organizer"/>
-	<classpathentry kind="src" path="src-subtitlsLinker"/>
-	<classpathentry kind="src" path="Z-tests"/>
-	<classpathentry kind="src" path="src-dater"/>
-	<classpathentry kind="src" path="src-deleteWhenPossible"/>
-	<classpathentry kind="src" path="src-documenter"/>
-	<classpathentry kind="src" path="src-randomVideo"/>
-	<classpathentry kind="src" path="src-Wacom-Restarter"/>
-	<classpathentry kind="src" path="src-robot-tests"/>
-	<classpathentry kind="src" path="src-launch-graphic-package"/>
-	<classpathentry kind="src" path="src-sequentzer"/>
-	<classpathentry kind="src" path="src-create-test-bats"/>
-	<classpathentry kind="src" path="src-more-sendtos"/>
-	<classpathentry kind="src" path="src-queue"/>
-	<classpathentry kind="src" path="src-raid-check"/>
-	<classpathentry kind="src" path="src-new-dayfolder"/>
-	<classpathentry kind="src" path="src-runners"/>
-	<classpathentry kind="src" path="src-param-repeater"/>
-	<classpathentry kind="src" path="src-file-aligner"/>
-	<classpathentry kind="src" path="src-clipBoardMacroInjecter"/>
-	<classpathentry kind="src" path="src-no-dup"/>
-	<classpathentry kind="src" path="src-versioning"/>
-	<classpathentry kind="src" path="src-photoshop-opacity-keystroker"/>
-	<classpathentry kind="src" path="src-autoswitchoff"/>
-	<classpathentry kind="lib" path="classes" sourcepath="E:/[Projects]/jna-master/jna-master/jna-src.zip"/>
+	<classpathentry kind="src" path="resources"/>
+	<classpathentry kind="src" path="src-dev"/>
+	<classpathentry kind="src" path="_useless"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/3"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Sgi.utilities"/>
+	<classpathentry kind="lib" path="lib/jna-4.1.0.jar" sourcepath="lib/jna-src.zip"/>
+	<classpathentry kind="lib" path="lib/jna-platform-4.1.0.jar" sourcepath="/com.sun.jna.platform/src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry kind="lib" path="httpServer"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
