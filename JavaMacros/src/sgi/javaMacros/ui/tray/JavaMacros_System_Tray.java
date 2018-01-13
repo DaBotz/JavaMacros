@@ -14,14 +14,39 @@ import java.awt.TrayIcon;
 import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 
-import sgi.javaMacros.debug.Debug;
+import sgi.generic.debug.Debug;
+import sgi.javaMacros.model.JavaMacrosMemory;
+import sgi.javaMacros.model.internal.ApplicationForMacros;
+import sgi.javaMacros.model.internal.UseCase;
+import sgi.javaMacros.model.internal.UseCases;
 import sgi.javaMacros.msgs.Messages;
 
 public class JavaMacros_System_Tray {
+
+	private class UseCaseSelectionListener implements ActionListener {
+		private ApplicationForMacros app;
+		private UseCase useCase;
+
+		public UseCaseSelectionListener(ApplicationForMacros application, UseCase useCase) {
+			this.app = application;
+			this.useCase = useCase;
+		}
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			app.set___currentUseCase(useCase);
+			JavaMacros_System_Tray.this.setCurrentApplication(app);
+		}
+	}
+
+	private static final MenuItem MY_1st_SEPARATOR = new MenuItem("-");
+	private static final MenuItem MY_2nd_SEPARATOR = new MenuItem("-");
 
 	private static final String FONT_FACE = "Verdana"; //$NON-NLS-1$
 
@@ -29,7 +54,42 @@ public class JavaMacros_System_Tray {
 
 	private static final Font BOLD = new Font(FONT_FACE, Font.BOLD, _TITLE).deriveFont((float) 13.1);
 	private static final Font NORMAL = new Font(FONT_FACE, Font.PLAIN, _TITLE).deriveFont((float) 13.1);
+	@SuppressWarnings("unused")
 	private static final Font ITALIC = new Font(FONT_FACE, Font.ITALIC, _TITLE).deriveFont((float) 13.1);
+	private ApplicationForMacros currentApplication;
+	private PropertyChangeListener applicationsListener;
+
+	public ApplicationForMacros getCurrentApplication() {
+		return currentApplication;
+	}
+
+	public void setCurrentApplication(ApplicationForMacros app) {
+		this.currentApplication = app;
+		if( applicationsListener== null) {
+			applicationsListener= new PropertyChangeListener() {
+
+				@Override
+				public void propertyChange(PropertyChangeEvent evt) {
+					Object source = evt.getSource();
+					
+					if (source instanceof UseCases) {
+						source= ((UseCases) source).getParent();
+					}else
+					if (source instanceof UseCase) {
+						source= ((UseCase) source).getParent().getParent();
+					}
+					if( source == currentApplication) {
+						refresh(); 
+					}
+				}
+				
+				
+			};
+			JavaMacrosMemory.instance().getApplications().addPropertyChangeListener(applicationsListener);
+			
+		}
+		refresh();
+	}
 
 	/**
 	 * 
@@ -91,7 +151,7 @@ public class JavaMacros_System_Tray {
 			try {
 				tray.add(trayIcon);
 			} catch (AWTException e) {
-				Debug.err("TrayIcon could not be added."); //$NON-NLS-1$
+				Debug.print(this, "TrayIcon could not be added."); //$NON-NLS-1$
 			}
 
 		} else {
@@ -101,7 +161,13 @@ public class JavaMacros_System_Tray {
 	}
 
 	public void refresh() {
-		trayIcon.setPopupMenu(createPopup());
+
+		try {
+			if (trayIcon != null)
+				trayIcon.setPopupMenu(createPopup());
+		} catch (Throwable e) {
+			Debug.info(e);
+		}
 	}
 
 	public void enableRollBacking(boolean roll) {
@@ -117,12 +183,46 @@ public class JavaMacros_System_Tray {
 		popup.add(createOption(TrayEventType.EDIT_APPLICATIONS, BOLD));
 		popup.add(createOption(TrayEventType.EDIT_DEVICES, BOLD));
 		popup.add(createOption(TrayEventType.FORCE_LUA_RELAUNCH, BOLD));
-		popup.addSeparator();
+		popup.add(MY_1st_SEPARATOR);
+		addCurrentAppCalls(popup, NORMAL);
+
 		popup.add(createOption(TrayEventType.DIE, BOLD));
-		
 
 		fillUncoveredOptions(popup);
 		return popup;
+	}
+
+	private void addCurrentAppCalls(PopupMenu popup, Font f) {
+		if (currentApplication != null) {
+			ArrayList<UseCase> manuals = currentApplication.getUseCases().getManuals();
+			if (manuals.size() > 0) {
+				MenuItem applicationItem = new MenuItem(currentApplication.getName());
+				boolean bGiven = false;
+
+				for (UseCase useCase : manuals) {
+
+					MenuItem useCaseItem = null;
+					if (useCase.isBasic()) {
+						useCaseItem = applicationItem;
+					} else {
+						useCaseItem = new MenuItem("      " + useCase.getName());
+
+					}
+					useCaseItem.addActionListener(new UseCaseSelectionListener(currentApplication, useCase));
+					if (useCase == currentApplication.get___currentUseCase()) {
+						useCaseItem.setFont(f.deriveFont(Font.BOLD));
+						bGiven = true;
+					}
+					popup.add(useCaseItem);
+
+				}
+				if (!bGiven)
+					applicationItem.setFont(f.deriveFont(Font.BOLD));
+
+				popup.add(MY_2nd_SEPARATOR);
+			}
+		}
+
 	}
 
 	protected void fillUncoveredOptions(PopupMenu popup) {
@@ -213,7 +313,6 @@ public class JavaMacros_System_Tray {
 		} else if (pingedImage.equals(trayIcon.getImage())) {
 			trayIcon.setImage(mainImage);
 		}
-
 	}
 
 }
