@@ -10,7 +10,7 @@ public class PayloadSelectorRadioButton extends JRadioButton {
 
 	public PayloadSelectorRadioButton(String text, ActionType type) {
 		super(text);
-		setActionCommand(ActionCommands.PAYLOAD.name() + "+" + type.name());
+//		setActionCommand(ActionCommands.PAYLOAD.name() + "+" + type.name());
 		this._action = type;
 	}
 
