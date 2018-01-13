@@ -1,25 +1,36 @@
 package sgi.javaMacros.model;
 
-import sgi.generic.serialization.AbstractMemoryParcel;
-import sgi.javaMacros.model.interfaces.IConfigAtom;
-import sgi.javaMacros.model.interfaces.IConfigChangeListener;
+import sgi.javaMacros.model.abstracts.JavaMacrosMemoryParcel;
+import sgi.javaMacros.model.internal.Macro;
 import sgi.javaMacros.model.lists.ApplicationSet;
 import sgi.javaMacros.model.lists.DeviceSet;
 
-public class JavaMacrosMemory extends AbstractMemoryParcel implements IConfigAtom {
+public class JavaMacrosMemory extends JavaMacrosMemoryParcel {
+
+	private transient Devices devices;
+	private transient Applications applications;
+	private transient Macros macros; 
+	private transient Macros erasedMacros; 
+	private transient Macros replacedMacros;
+	private boolean unlimitedTrees; 
 
 	/**
 	 * @deprecated
 	 */
 	private JavaMacrosMemory() {
 		super();
-
+		relink(null);
+		devices.endStartup();
+		applications.endStartup();
+		macros.endStartup();
+		endStartup();
 	}
 
 	@Override
 	public void loadFromFile() {
 		devices = new Devices();
 		applications = new Applications();
+		macros= new Macros(); 
 
 	}
 
@@ -27,10 +38,31 @@ public class JavaMacrosMemory extends AbstractMemoryParcel implements IConfigAto
 	public void storeToFile() {
 		devices.storeToFile();
 		applications.storeToFile();
+		macros.storeToFile();
+
+		ifNotNullStore(erasedMacros);
+		ifNotNullStore(replacedMacros);
 	}
 
-	private transient Devices devices;
-	private transient Applications applications;
+	public Macros getMacros() {
+		return macros;
+	}
+
+	public Macros getErasedMacros() {
+		if(erasedMacros== null )erasedMacros= new ErasedMacros(); 
+		return erasedMacros;
+	}
+
+	public Macros getReplacedMacros() {
+		if(replacedMacros== null )replacedMacros= new ReplacedMacros(); 
+		return replacedMacros;
+	}
+
+	protected void ifNotNullStore(Macros eMacros) {
+		if( eMacros != null ) {
+			eMacros.storeToFile();
+		}
+	}
 
 	public Applications getApplications() {
 		return applications;
@@ -39,8 +71,10 @@ public class JavaMacrosMemory extends AbstractMemoryParcel implements IConfigAto
 	private static transient JavaMacrosMemory root;
 
 	public static JavaMacrosMemory instance() {
-		if (root == null)
+		if (root == null) {
 			root = new JavaMacrosMemory();
+			root.getMacros().getList().createTransientLinks(); 
+		}
 		return root;
 	}
 
@@ -53,30 +87,28 @@ public class JavaMacrosMemory extends AbstractMemoryParcel implements IConfigAto
 		return getApplications().getSet();
 	}
 
-	@Override
-	public IConfigAtom getParent() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void setParent(IConfigAtom parent) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void addConfigChangeListener(IConfigChangeListener listener) {
-		// TODO Auto-generated method stub
-
-	}
-
 	public DeviceSet getDeviceSet() {
 		return getDevices().getSet();
 	}
 
+	
 	public Devices getDevices() {
 		return devices;
 	}
+
+	public void eraseMacro(Macro macro2) {
+		if(macro2 == null) return;
+		getMacros().getList().remove(macro2);
+		macro2.setDeletionTime(System.currentTimeMillis());
+		getErasedMacros().getList().add(macro2);
+
+		
+	}
+
+	public boolean useUnLimitedTrees() {
+
+		return unlimitedTrees;
+	}
+
 
 }

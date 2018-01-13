@@ -1,25 +1,31 @@
 package sgi.javaMacros.model;
 
 
+
+
+import sgi.javaMacros.model.abstracts.JavaMacrosMemoryParcel;
 import sgi.javaMacros.model.lists.DeviceSet;
-import sgi.javaMacros.model.persistent.AbstractJavaMacrosMemoryParcel;
 
-public class Devices extends AbstractJavaMacrosMemoryParcel {
+public class Devices extends JavaMacrosMemoryParcel {
 
-	DeviceSet set;
+	private DeviceSet set;
 	@Override
 	protected void initializeDefaultValues() {
 		set = new DeviceSet();
+		set.setParent(this);
 
 	}
 
 	public Devices() {
 
-		set.addConfigChangeListener(this);
 
 	}
 
 	public DeviceSet getSet() {
 		return set;
 	}
+
+	
+
+
 }

@@ -41,6 +41,7 @@ public class StringUtils {
 				exe2.setCharAt(j, ' ');
 			} else if (Character.isLowerCase(ch1) && Character.isUpperCase(ch2)) {
 				exe2.insert(index, ' ');
+				
 			} else if (ch2 == '[') {
 				switch(ch1){
 					case '[': 
