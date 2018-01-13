@@ -1,34 +1,37 @@
 package sgi.javaMacros.ui.dialogs;
 
-import java.awt.GridLayout;
-import java.awt.HeadlessException;
-import java.awt.Window;
 import java.awt.Color;
-import java.awt.Dialog.ModalityType;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.Component;
+import java.awt.GridLayout;
+import java.awt.Window;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 
-import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 
-import sgi.generic.ui.GUIMemory;
-import sgi.generic.ui.IMessages;
-import sgi.generic.ui.ModalConfigDialog;
+import sgi.configuration.ConfigurationAtom;
+import sgi.gui.ComponentWalker;
+import sgi.gui.IComponentModifier;
+import sgi.gui.IElementNodeSelectionListener;
+import sgi.gui.configuration.IAwareOfChanges;
 import sgi.javaMacros.model.JavaMacrosMemory;
-import sgi.javaMacros.model.internal.Application;
+import sgi.javaMacros.model.internal.ApplicationForMacros;
 import sgi.javaMacros.model.lists.ApplicationSet;
 import sgi.javaMacros.model.lists.ApplicationSet.ApplicationList;
 import sgi.javaMacros.msgs.Messages;
-import sgi.javaMacros.os.windows.ApplicationsRetriever;
+import sgi.javaMacros.ui.ModalConfigDialog;
+import sgi.localization.IMessages;
 
 public class ApplicationListDialog extends ModalConfigDialog {
+	private static final String MSG_PREFIX = "sgi.javaMacros.ui.dialogs.ApplicationListDialog";
 	/**
 	 * 
 	 */
@@ -37,108 +40,176 @@ public class ApplicationListDialog extends ModalConfigDialog {
 	public ApplicationListDialog(Window owner, ModalityType modalityType) {
 		super(owner, modalityType);
 	}
-
+	
+	private HashSet<ApplicationListUpdater> disposables = new HashSet<>(); 
 	@Override
-	public void build(Object object, IMessages msgs) throws HeadlessException {
-		super.build(object, msgs);
-		setContentPane(new JScrollPane(getContentPane()));
+	public void dispose() {
+		for (ApplicationListUpdater disposed : disposables) {
+			disposed.removeMe();
+		}
+		super.dispose();
+	}
+
+	private JComponent innerList;
+
+	public void build(Capsule capsule, IMessages msgs) {
+
+		setTitle(msgs._$(MSG_PREFIX + ".title"));
+		setIconImage(msgs.getIcon());
+		JavaMacrosPanelCreator creator = new JavaMacrosPanelCreator(msgs, MSG_PREFIX) {
+
+			@Override
+			protected JComponent createCollectionEditor(IAwareOfChanges anObject, Field field)
+					throws IllegalArgumentException, IllegalAccessException {
+				// TODO Auto-generated method stub
+				innerList = super.createCollectionEditor(anObject, field);
+				return innerList;
+			}
+
+			@Override
+			protected JPanel createCollectionSingleLine(Field field, boolean addRemovers, JPanel p,
+					boolean collectionAsHorizontalalList, Collection<IAwareOfChanges> q, GridLayout layout,
+					final IAwareOfChanges node) throws IllegalAccessException {
+
+				final JPanel panel = super.createCollectionSingleLine(field, addRemovers, p,
+						collectionAsHorizontalalList, q, layout, node);
+
+				PropertyChangeListener listener = new ApplicationListUpdater(panel, node);
+				listener.propertyChange(null);
+				node.addPropertyChangeListener(listener);
+
+				return panel;
+			}
+		};
+
+		creator.setUseFieldSeparators(true);
+		creator.setCollectionElementsOpeningListeners(Capsule.class, "applications",
+				new IElementNodeSelectionListener() {
+
+					@Override
+					public void handleSelection(Object target) {
+						ApplicationModifyDialog modify = new ApplicationModifyDialog(getWindow(),
+								ModalityType.APPLICATION_MODAL);
+						modify.build((ApplicationForMacros) target, Messages.M);
+						modify.autoPosition();
+						modify.setVisible(true);
+
+					}
+				});
+
+		creator.createConfigPanel(capsule);
+
+		setContentPane(innerList);
+
 		pack();
-		GUIMemory.add(this);
+
 		setResizable(true);
 	}
 
-	@Override
-	public boolean doesCollectionAdmitRemovers(Object anObject, Field aField) {
-		return false;
-	}
+	class ApplicationListUpdater implements PropertyChangeListener {
+		private final JPanel panel;
+		private final IAwareOfChanges node;
+		PropertyChangeListener me = this;
+		boolean wasShown = false;
 
-	@Override
-	protected JPanel createCollectionSingleLine(Field field, boolean addRemovers, JPanel p,
-			boolean collectionAsHorizontalalList, Collection<?> q, GridLayout layout, ButtonGroup radios, Object node)
-			throws IllegalAccessException {
-		JPanel line = super.createCollectionSingleLine(field, addRemovers, p, collectionAsHorizontalalList, q, layout,
-				radios, node);
-
-		if (node instanceof Application) {
-			final Application app = (Application) node;
-			final ApplicationListDialog me = this;
-			if (app.getName().trim().isEmpty())
-				return new JPanel();
-
-			JButton btn = new JButton(app.getBigIcon());
-			line.add(btn);
-			btn.setBackground(new Color(0, 0, 0, 0));
-
-			btn.setOpaque(false);
-			btn.setToolTipText(getMsgs()._$(this, "ClickToEdit"));
-			btn.addActionListener(new ActionListener() {
-
-				@Override
-				public void actionPerformed(ActionEvent e) {
-					if (!app.isEnabled())
-						return;
-
-					ModalConfigDialog appConfig = new ApplicationModifyDialog(me, ModalityType.DOCUMENT_MODAL);
-					app.getUseCases();
-					appConfig.build(app, getMsgs());
-					appConfig.autoPosition();
-					appConfig.setVisible(true);
-				}
-			});
+		ApplicationListUpdater(JPanel panel, IAwareOfChanges node) {
+			this.panel = panel;
+			this.node = node;
+			disposables.add(this); 
 		}
 
-		return line;
+		@Override
+		public void propertyChange(PropertyChangeEvent evt) {
+			
+			if (panel.isDisplayable())
+				wasShown = true;
+			else if (wasShown)
+				node.removePropertyChangeListener(me);
+
+			panel.setOpaque(true);
+
+			final ApplicationForMacros app = (ApplicationForMacros) node;
+
+			new ComponentWalker(new IComponentModifier() {
+
+				@Override
+				public void modify(Component component) {
+
+					if (component instanceof JButton) {
+						JButton jb = (JButton) component;
+						if (jb.getForeground().equals(Color.YELLOW)) {
+							jb.setEnabled(!app.mayBePurged());
+							jb.setVisible(app.isReal());
+							return;
+						} else
+							component.setBackground(new Color(255, 255, 255, 0));
+					} else if (app.isAbsent()) {
+						component.setBackground(ConfigurationAtom.getAbsentColor());
+					} else if (app.isEnabled()) {
+						component.setBackground(ConfigurationAtom.getEnabledColor());
+					} else if (!app.mayBePurged()) {
+						component.setBackground(ConfigurationAtom.getDisabledColor());
+					} else {
+						component.setBackground(null);
+					}
+
+				}
+			}).walk(panel);
+			panel.repaint(50);
+		}
+		
+		public void removeMe() {
+			node.removePropertyChangeListener(me);
+			
+		}
 	}
 
-	@Override
-	protected JPanel createEndButtons() {
-		super.createEndButtons();
-		return null;
-	}
-
-	private class Capsule {
-
-		@SuppressWarnings("unused")
+	public class Capsule extends ConfigurationAtom {
 		ApplicationList applications;
 
 		public Capsule(ApplicationList applications) {
 			this.applications = applications;
 		}
-
 	}
 
 	public void loadApplications() {
-		ApplicationSet allWindows = ApplicationsRetriever.getAllWindows();
-
 		JavaMacrosMemory memory = JavaMacrosMemory.instance();
 		ApplicationSet applicationSet = memory.getApplications().getSet();
 		applicationSet.purge();
-		applicationSet.addAll(allWindows);
+		applicationSet.loadAppsFromSystem();
 		ApplicationList aslist = applicationSet.aslist();
-		Collections.sort(aslist, new Comparator<Application>() {
+		// aslist.remove(ApplicationForMacros.getANY());
+		Collections.sort(aslist, new Comparator<ApplicationForMacros>() {
 
 			@Override
-			public int compare(Application o1, Application o2) {
+			public int compare(ApplicationForMacros o1, ApplicationForMacros o2) {
 				return o1.getName().compareTo(o2.getName());
 			}
 		});
 
-		Iterator<Application> asIt = aslist.iterator();
+		Iterator<ApplicationForMacros> asIt = aslist.iterator();
+
 		while (asIt.hasNext()) {
-			Application application = (Application) asIt.next();
+			ApplicationForMacros application = (ApplicationForMacros) asIt.next();
 			if (application.getExeFile().contains("LuaMacros.exe"))
 				asIt.remove();
 
 		}
 		build(new Capsule(aslist), Messages.M);
 
-	}
+		aslist.addPropertyChangeListener(new PropertyChangeListener() {
+			PropertyChangeListener me = this;
 
-	@Override
-	protected void addRemover(JPanel p, Collection<?> q, GridLayout layout, Object node, JPanel p0,
-			boolean collectionAsHorizontalalList) {
-		// TODO Auto-generated method stub
-		super.addRemover(p, q, layout, node, p0, collectionAsHorizontalalList);
+			@Override
+			public void propertyChange(PropertyChangeEvent evt) {
+				if (!ApplicationListDialog.this.isDisplayable())
+					aslist.removePropertyChangeListener(me);
+				if (evt.getOldValue() instanceof ApplicationForMacros) {
+
+					memory.getApplications().getSet().remove(evt.getOldValue());
+				}
+			}
+		});
 	}
 
 }
