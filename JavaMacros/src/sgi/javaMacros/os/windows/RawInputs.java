@@ -22,8 +22,6 @@ import com.sun.jna.win32.W32APIOptions;
 
 import sgi.javaMacros.os.windows.RawInputs.WindowsRawInput.RID_DEVICE_INFO;
 import sgi.javaMacros.os.windows.RawInputs.WindowsRawInput.RID_DEVICE_INFO_HID;
-import sgi.os.windows.HIDPages;
-import sgi.os.windows.HIDPages.HIDPage;
 
 public class RawInputs {
 
@@ -97,7 +95,7 @@ public class RawInputs {
 
 				}
 
-				HIDPage usagePage = HIDPages.getPage(hid.usUsagePage.intValue());
+				HIDPages.HIDPage usagePage = HIDPages.getPage(hid.usUsagePage.intValue());
 				if (usagePage != null) {
 					buffer.append("\n");
 					buffer.append(usagePage.getPageDescription() + ": " + usagePage.get(hid.usUsage.intValue()));

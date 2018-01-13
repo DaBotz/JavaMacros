@@ -837,7 +837,7 @@ public class HIDPages {
 		page.put(0x24, "Display Control Report");
 		page.put(0x25, "Clear Display");
 		page.put(0x26, "Display Enable");
-		page.put(0x27, "Screen Saver Delay");
+		page.put(0x27, "Screen Saver DelayAction");
 		page.put(0x28, "Screen Saver Enable");
 		page.put(0x29, "Vertical Scroll");
 		page.put(0x2A, "Horizontal Scroll");
@@ -911,8 +911,8 @@ public class HIDPages {
 		page.put(0x48, "Top Corner Distortion Balance");
 		page.put(0x4A, "Bottom Corner Distortion Control");
 		page.put(0x4C, "Bottom Corner Distortion Balance");
-		page.put(0x56, "Moiré Horizontal");
-		page.put(0x58, "Moiré Vertical");
+		page.put(0x56, "Moire Horizontal");
+		page.put(0x58, "Moire Vertical");
 		page.put(0x5E, "Input Level Select");
 		page.put(0x60, "Input Source Select");
 		page.put(0x62, "Stereo Mode");
